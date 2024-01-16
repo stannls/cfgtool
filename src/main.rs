@@ -1,4 +1,6 @@
-use clap::{Command, command, arg, value_parser, Arg};
+use api::fs::DotfileStorage;
+use clap::{Command, command, arg, value_parser, Arg, Subcommand, ArgMatches};
+mod api;
 
 fn main() {
     let cmd = Command::new("cfgtool")
@@ -20,5 +22,14 @@ fn main() {
                     .about("Sync your dotfiles with a remote"))
         .subcommand(Command::new("rollback")
                     .about("Rollback a file to a previous version"));
-    let matches = cmd.get_matches().subcommand().expect("Clap should ensure that this never happens.");
+    let matches = cmd.get_matches();
+    handle_command(matches.subcommand().expect("Clap should ensure that this never happens.").1);
+}
+
+fn handle_command(matches: &ArgMatches) {
+    let mut dotfile_repo_path = dirs::data_dir().expect("Critical Failure while trying to create config dir");
+    dotfile_repo_path.push("cfgtool");
+    dotfile_repo_path.push("repo");
+
+    let dotfile_repo = DotfileStorage::new(&dotfile_repo_path).unwrap();
 }
