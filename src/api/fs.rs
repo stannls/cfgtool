@@ -1,4 +1,5 @@
 use std::error::Error;
+use std::ffi::OsString;
 use std::fs;
 use std::path::PathBuf;
 
@@ -49,9 +50,20 @@ impl DotfileStorage {
             std::io::ErrorKind::InvalidInput,
             "File does not exist",
         ))?;
-        let mut repo_location = self.repo_path.to_owned();
-        repo_location.push(filename);
-
+        let repo_location: PathBuf = self
+            .repo_path
+            .to_owned()
+            .iter()
+            .chain(
+                path.iter().skip(
+                    dirs::home_dir()
+                        .expect("Operating system not supportet")
+                        .iter()
+                        .count(),
+                ),
+            )
+            .collect();
+        fs::create_dir_all(repo_location.as_path().parent().expect("Criticical fs error."))?;
         fs::copy(path, repo_location)
             .map(|_r| {
                 self.tracked_files
