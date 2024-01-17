@@ -34,17 +34,47 @@ impl DotfileStorage {
             tracked_files,
         })
     }
-    pub fn track_file(&mut self, path: &PathBuf) -> Result<(), Box<dyn Error +Send +Sync>> {
+    pub fn track_file(&mut self, path: &PathBuf) -> Result<(), Box<dyn Error + Send + Sync>> {
         if !path.as_path().is_file() {
-            return Err(Box::new(std::io::Error::new(std::io::ErrorKind::InvalidInput, "File does not exist")));
+            return Err(Box::new(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "File does not exist",
+            )));
         }
         // Convert relative path to absolute path
         let path = &fs::canonicalize(path)?;
+        DotfileStorage::validate_filepath(path)?;
 
-        let filename = path.as_path().file_name().ok_or(std::io::Error::new(std::io::ErrorKind::InvalidInput, "File does not exist"))?;
+        let filename = path.as_path().file_name().ok_or(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "File does not exist",
+        ))?;
         let mut repo_location = self.repo_path.to_owned();
         repo_location.push(filename);
 
-        fs::copy(path, repo_location).map(|_r| self.tracked_files.push(filename.to_string_lossy().to_string())).map_err(|e| Box::new(e) as Box<dyn Error +Send +Sync>)
+        fs::copy(path, repo_location)
+            .map(|_r| {
+                self.tracked_files
+                    .push(filename.to_string_lossy().to_string())
+            })
+            .map_err(|e| Box::new(e) as Box<dyn Error + Send + Sync>)
+    }
+
+    // Checks if the given path is in the homedir
+    fn validate_filepath(path: &PathBuf) -> std::io::Result<()> {
+        match path.as_path().starts_with(
+            dirs::home_dir()
+                .ok_or(std::io::Error::new(
+                    std::io::ErrorKind::Unsupported,
+                    "Config files outside the homedir aren't supported yet.",
+                ))?
+                .into_os_string(),
+        ) {
+            true => Ok(()),
+            false => Err(std::io::Error::new(
+                std::io::ErrorKind::Unsupported,
+                "Config files outside the homedir aren't supported yet.",
+            )),
+        }
     }
 }
