@@ -1,5 +1,5 @@
 use api::fs::DotfileStorage;
-use clap::{Command, command, arg, value_parser, Arg, Subcommand, ArgMatches};
+use clap::{Command, arg, value_parser, ArgMatches};
 mod api;
 
 fn main() {

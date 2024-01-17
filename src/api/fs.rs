@@ -1,10 +1,8 @@
 use std::error::Error;
 use std::fs;
-use std::io;
 use std::path::PathBuf;
 
 use git2::Repository;
-use git2::TreeWalkResult;
 
 pub struct DotfileStorage {
     path: PathBuf,
@@ -23,22 +21,13 @@ impl DotfileStorage {
                 Err(e) => return Err(Box::new(e)),
             },
         };
-        let mut tracked_files = vec![];
-        // Introduce new scope because of borrow checker shenanigans.
-        {
-            let main_rev = repo.revparse_single("HEAD")?;
-            let tree = main_rev.as_tree().ok_or(std::io::Error::new(
-                io::ErrorKind::Other,
-                "Error creating repository tree.",
-            ))?;
-            let _ = tree.walk(git2::TreeWalkMode::PreOrder, |_, entry| {
-                match entry.name() {
-                    Some(name) => tracked_files.push(name.to_string()),
-                    _ => {}
-                }
-                TreeWalkResult::Ok
-            });
-        };
+        let index = repo.index()?;
+        let tracked_files = index
+            .iter()
+            .map(|e| String::from_utf8(e.path))
+            .filter(|e| e.is_ok())
+            .map(|e| e.unwrap())
+            .collect();
         Ok(DotfileStorage {
             path: path.to_owned(),
             repo,
