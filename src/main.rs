@@ -37,7 +37,14 @@ fn handle_command(matches: &ArgMatches) -> Result<(), Box<dyn Error + Sync + Sen
     let mut dotfile_repo = DotfileStorage::new(&dotfile_repo_path).unwrap();
 
     match matches.subcommand().expect("This should never happen.") {
-        ("track", subcommand_match) => dotfile_repo.track_file(subcommand_match.get_one("path").expect("Should never happen.")),
+        ("track", subcommand_match) => {
+            if dotfile_repo.is_tracked(subcommand_match.get_one("path").expect("Should never happen.")){
+                println!("File is already tracked.");
+                Ok(())
+            } else {
+                dotfile_repo.track_file(subcommand_match.get_one("path").expect("Should never happen."))
+            }
+        },
         (_, _) => Ok(())
         
     }

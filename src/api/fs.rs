@@ -1,7 +1,7 @@
 use std::error::Error;
 use std::ffi::OsString;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{PathBuf, Path};
 
 use git2::Repository;
 
@@ -63,7 +63,12 @@ impl DotfileStorage {
                 ),
             )
             .collect();
-        fs::create_dir_all(repo_location.as_path().parent().expect("Criticical fs error."))?;
+        fs::create_dir_all(
+            repo_location
+                .as_path()
+                .parent()
+                .expect("Criticical fs error."),
+        )?;
         fs::copy(path, repo_location)
             .map(|_r| {
                 self.tracked_files
@@ -88,5 +93,22 @@ impl DotfileStorage {
                 "Config files outside the homedir aren't supported yet.",
             )),
         }
+    }
+    pub fn is_tracked(&mut self, path: &PathBuf) -> bool {
+        let path = fs::canonicalize(path).unwrap();
+        let repo_location: PathBuf = self
+            .repo_path
+            .to_owned()
+            .iter()
+            .chain(
+                path.iter().skip(
+                    dirs::home_dir()
+                        .expect("Operating system not supportet")
+                        .iter()
+                        .count(),
+                ),
+            )
+            .collect();
+        Path::new(&repo_location).exists()
     }
 }
