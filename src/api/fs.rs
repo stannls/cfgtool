@@ -38,9 +38,13 @@ impl DotfileStorage {
         if !path.as_path().is_file() {
             return Err(Box::new(std::io::Error::new(std::io::ErrorKind::InvalidInput, "File does not exist")));
         }
+        // Convert relative path to absolute path
+        let path = &fs::canonicalize(path)?;
+
         let filename = path.as_path().file_name().ok_or(std::io::Error::new(std::io::ErrorKind::InvalidInput, "File does not exist"))?;
         let mut repo_location = self.repo_path.to_owned();
         repo_location.push(filename);
+
         fs::copy(path, repo_location).map(|_r| self.tracked_files.push(filename.to_string_lossy().to_string())).map_err(|e| Box::new(e) as Box<dyn Error +Send +Sync>)
     }
 }
