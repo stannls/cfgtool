@@ -1,6 +1,6 @@
 use std::rc::Rc;
 use std::error::Error;
-use std::ffi::OsString;
+use std::ffi::{CString, OsString};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -36,7 +36,7 @@ impl DotfileStorage {
             tracked_files,
         })
     }
-    pub fn track_file(&mut self, path: &PathBuf) -> Result<(), Box<dyn Error + Send + Sync>> {
+    pub fn track_file(&mut self, path: &PathBuf, commit_msg: Option<&str>) -> Result<(), Box<dyn Error + Send + Sync>> {
         if !path.as_path().is_file() {
             return Err(Box::new(std::io::Error::new(
                 std::io::ErrorKind::InvalidInput,
@@ -76,9 +76,41 @@ impl DotfileStorage {
                     .push(filename.to_string_lossy().to_string())
             })
             .map_err(|e| Box::new(e) as Box<dyn Error + Send + Sync>)?;
-        let commit_msg = format!("Tracked file {}", filename.to_string_lossy().to_string());
+        let default_msg = format!("Tracked file {}", filename.to_string_lossy());
+        let commit_msg = commit_msg.unwrap_or(&default_msg);
         self.add_and_commit(&path.into_iter().skip(3).collect::<PathBuf>().as_path(), &commit_msg)?;
         Ok(())
+    }
+    // Helper function that returns all files  currently tracked by the git repo
+    fn get_tracked_files(&self) -> Result<Vec<PathBuf>, Box<dyn Error +Send +Sync>> {
+        let paths = self.repo.index()?.iter()
+            .map(|c| CString::new(c.path).unwrap().into_string().unwrap())
+            .map(|c| {
+            let mut path = self.repo_path.to_owned();
+            for part in c.split("/") {
+                path.push(part);
+            }
+            path
+        }).collect();
+        Ok(paths)
+    }
+
+    // Function that returns all tracked file that have a diff to the git repo
+    pub fn get_changed_files(&self) -> Result<Vec<PathBuf>, Box<dyn Error +Send +Sync>> {
+        Ok(self.get_tracked_files()?.into_iter()
+            .filter(|f| {
+                // The local counterpart to the tracked file
+                let local_counterpart: PathBuf = dirs::home_dir().unwrap().as_path().iter()
+                    .chain(f.to_owned().as_path().iter().skip(self.repo_path.as_path().iter().count())).collect();
+                // Reads both files into a string
+                let repo_file = fs::read_to_string(f).unwrap();
+                let local_file = fs::read_to_string(local_counterpart).unwrap();
+                // Checks for diff
+                repo_file != local_file
+            })
+            // Convert every remaining path into their local counterpart
+            .map(|f| dirs::home_dir().unwrap().as_path().iter().chain(f.as_path().iter().skip(self.repo_path.as_path().iter().count())).collect::<PathBuf>())
+            .collect())
     }
 
     // Helper function that adds a file to the index and then commits.
