@@ -107,7 +107,10 @@ impl DotfileStorage {
                 let local_file = fs::read_to_string(local_counterpart).unwrap();
                 // Checks for diff
                 repo_file != local_file
-        }).collect())
+            })
+            // Convert every remaining path into their local counterpart
+            .map(|f| dirs::home_dir().unwrap().as_path().iter().chain(f.as_path().iter().skip(self.repo_path.as_path().iter().count())).collect::<PathBuf>())
+            .collect())
     }
 
     // Helper function that adds a file to the index and then commits.

@@ -48,6 +48,9 @@ fn handle_command(matches: &ArgMatches) -> Result<(), Box<dyn Error + Sync + Sen
             }
         },
         ("update", subcommand_match) => {
+            if dotfile_repo.get_changed_files()?.len() == 0 {
+                println!("Nothing has changed.");
+            }
             for file in dotfile_repo.get_changed_files()? {
                 print!("File {} has changed. Do you want to track the changes? (y/n) ", file.to_owned().into_os_string().to_string_lossy().to_string());
                 //  Ensure text gets printed
@@ -58,7 +61,7 @@ fn handle_command(matches: &ArgMatches) -> Result<(), Box<dyn Error + Sync + Sen
                     "y" => {
                         println!("Please describe your changes:");
                         let msg = stdin.lock().lines().next().unwrap().unwrap();
-                        let _ = dotfile_repo.track_file(&file, Some(&msg));
+                        dotfile_repo.track_file(&file, Some(&msg))?;
                     },
                     "n" => println!("Ignoring..."),
                     _ => println!("Invalid input given. Skipping for now.")
