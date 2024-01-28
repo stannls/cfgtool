@@ -46,7 +46,7 @@ fn handle_command(matches: &ArgMatches) -> Result<(), Box<dyn Error + Sync + Sen
             }
         },
         ("update", subcommand_match) => {
-            println!("{:?}", dotfile_repo.get_tracked_files()?);
+            println!("{:?}", dotfile_repo.get_changed_files()?);
             Ok(())
         }
         (_, _) => Ok(())
