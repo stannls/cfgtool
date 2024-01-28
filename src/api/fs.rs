@@ -1,6 +1,6 @@
 use std::rc::Rc;
 use std::error::Error;
-use std::ffi::OsString;
+use std::ffi::{CString, OsString};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -79,6 +79,18 @@ impl DotfileStorage {
         let commit_msg = format!("Tracked file {}", filename.to_string_lossy().to_string());
         self.add_and_commit(&path.into_iter().skip(3).collect::<PathBuf>().as_path(), &commit_msg)?;
         Ok(())
+    }
+    pub fn get_tracked_files(&self) -> Result<Vec<PathBuf>, Box<dyn Error +Send +Sync>> {
+        let paths = self.repo.index()?.iter()
+            .map(|c| CString::new(c.path).unwrap().into_string().unwrap())
+            .map(|c| {
+            let mut path = self.repo_path.to_owned();
+            for part in c.split("/") {
+                path.push(part);
+            }
+            path
+        }).collect();
+        Ok(paths)
     }
 
     // Helper function that adds a file to the index and then commits.

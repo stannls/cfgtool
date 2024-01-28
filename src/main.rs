@@ -45,6 +45,10 @@ fn handle_command(matches: &ArgMatches) -> Result<(), Box<dyn Error + Sync + Sen
                 dotfile_repo.track_file(subcommand_match.get_one("path").expect("Should never happen."))
             }
         },
+        ("update", subcommand_match) => {
+            println!("{:?}", dotfile_repo.get_tracked_files()?);
+            Ok(())
+        }
         (_, _) => Ok(())
         
     }
