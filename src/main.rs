@@ -19,7 +19,7 @@ fn main() {
                          )
                     )
         .subcommand(Command::new("update")
-                    .about("Update a tracked file."))
+                    .about("Update all tracked files."))
         .subcommand(Command::new("sync")
                     .about("Sync your dotfiles with a remote"))
         .subcommand(Command::new("rollback")

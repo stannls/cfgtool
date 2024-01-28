@@ -2,8 +2,8 @@
 ## Functionality
 ### Tracking a file
 Use ```cfgtool track /path/to/file``` to start tracking a file.
-### Updating a file
-Use ```cfgtool update /path/to/file``` to create a new commit with your config changes. You can also specify multiple files to be parts. Alternatively use ```cfgtool update -a``` to update all files.
+### Updating the tracked file
+Use ```cfgtool update``` to update the changes of your tracked files.
 ### Syncing with a remote
 Use ```cfgtool sync``` to sync your local commits with a remote git repo.
 ### Rollback
