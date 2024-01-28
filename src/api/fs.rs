@@ -36,7 +36,7 @@ impl DotfileStorage {
             tracked_files,
         })
     }
-    pub fn track_file(&mut self, path: &PathBuf) -> Result<(), Box<dyn Error + Send + Sync>> {
+    pub fn track_file(&mut self, path: &PathBuf, commit_msg: Option<&str>) -> Result<(), Box<dyn Error + Send + Sync>> {
         if !path.as_path().is_file() {
             return Err(Box::new(std::io::Error::new(
                 std::io::ErrorKind::InvalidInput,
@@ -76,7 +76,8 @@ impl DotfileStorage {
                     .push(filename.to_string_lossy().to_string())
             })
             .map_err(|e| Box::new(e) as Box<dyn Error + Send + Sync>)?;
-        let commit_msg = format!("Tracked file {}", filename.to_string_lossy().to_string());
+        let default_msg = format!("Tracked file {}", filename.to_string_lossy());
+        let commit_msg = commit_msg.unwrap_or(&default_msg);
         self.add_and_commit(&path.into_iter().skip(3).collect::<PathBuf>().as_path(), &commit_msg)?;
         Ok(())
     }
