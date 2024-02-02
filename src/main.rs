@@ -72,7 +72,22 @@ fn handle_command(matches: &ArgMatches) -> Result<(), Box<dyn Error + Sync + Sen
         ("sync", subcommand_match) => {
             match dotfile_repo.get_default_remote() {
                 Some(remote) => println!("Default remote {remote}."),
-                None => println!("No default remote."),
+                None => {
+                    print!("No remote to sync known. Do you want to add one? (y/n) ");    
+                    //  Ensure text gets printed
+                    io::stdout().flush()?;
+                    // Cant directly match the response because then stdin won't get unlocked
+                    let response = stdin.lock().lines().next().unwrap().unwrap();
+                    match response.as_str() {
+                        "y" => {
+                            println!("Please enter the remotes url:");
+                            let url = stdin.lock().lines().next().unwrap().unwrap();
+                            dotfile_repo.add_remote("origin", &url)?;
+                        },
+                        "n" => println!("Ignoring..."),
+                        _ => println!("Invalid input given. Skipping for now.")
+                    }
+                },
             }
             Ok(())
         }

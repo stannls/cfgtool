@@ -188,6 +188,14 @@ impl DotfileStorage {
             None
         }
     }
+    pub fn add_remote(&mut self, name: &str, url: &str) -> Result<(), Box<dyn Error + Send + Sync>> {
+        self.repo.remote_set_url(name, url)?;
+        if !self.remotes.iter().any(|f| f == name) {
+            self.remotes.push(name.to_string());
+        }
+        Ok(())
+
+    }
 }
 
 fn string_arry_to_vec(arr: StringArray) -> Vec<String> {
