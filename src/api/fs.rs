@@ -4,12 +4,14 @@ use std::ffi::{CString, OsString};
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use git2::string_array::StringArray;
 use git2::{Index, Repository, Status, Commit};
 
 pub struct DotfileStorage {
     repo_path: PathBuf,
     repo: Rc<Repository>,
     tracked_files: Vec<String>,
+    remotes: Vec<String>
 }
 
 impl DotfileStorage {
@@ -30,10 +32,12 @@ impl DotfileStorage {
             .filter(|e| e.is_ok())
             .map(|e| e.unwrap())
             .collect();
+        let remotes = repo.remotes().map(|f| string_arry_to_vec(f))?;
         Ok(DotfileStorage {
             repo_path: path.to_owned(),
             repo: Rc::new(repo),
             tracked_files,
+            remotes,
         })
     }
     pub fn track_file(&mut self, path: &PathBuf, commit_msg: Option<&str>) -> Result<(), Box<dyn Error + Send + Sync>> {
@@ -175,4 +179,17 @@ impl DotfileStorage {
             .collect();
         Path::new(&repo_location).exists()
     }
+    pub fn get_default_remote(&self) -> Option<&str> {
+        if self.remotes.iter().any(|f| f == &"origin") {
+            Some("origin")
+        } else if self.remotes.len() != 0 {
+            self.remotes.get(0).map(|f| f.as_str())
+        } else  {
+            None
+        }
+    }
+}
+
+fn string_arry_to_vec(arr: StringArray) -> Vec<String> {
+    arr.into_iter().map(|f| f.map(|g| g.to_string()).unwrap()).collect()
 }

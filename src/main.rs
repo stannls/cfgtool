@@ -68,6 +68,13 @@ fn handle_command(matches: &ArgMatches) -> Result<(), Box<dyn Error + Sync + Sen
                 }
             }
             Ok(())
+        },
+        ("sync", subcommand_match) => {
+            match dotfile_repo.get_default_remote() {
+                Some(remote) => println!("Default remote {remote}."),
+                None => println!("No default remote."),
+            }
+            Ok(())
         }
         (_, _) => Ok(())
         
