@@ -89,6 +89,10 @@ fn handle_command(matches: &ArgMatches) -> Result<(), Box<dyn Error + Sync + Sen
                     }
                 },
             }
+            // TODO: Respect diff between local files and local repo.
+            // Currently these diffs will get overwritten on sync
+            dotfile_repo.pull_main()?;
+            dotfile_repo.push_main()?;
             Ok(())
         }
         (_, _) => Ok(())
