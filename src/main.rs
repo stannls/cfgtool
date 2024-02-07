@@ -47,7 +47,7 @@ fn handle_command(matches: &ArgMatches) -> Result<(), Box<dyn Error + Sync + Sen
                 dotfile_repo.track_file(subcommand_match.get_one("path").expect("Should never happen."), None)
             }
         },
-        ("update", subcommand_match) => {
+        ("update", _subcommand_match) => {
             if dotfile_repo.get_changed_files()?.len() == 0 {
                 println!("Nothing has changed.");
             }

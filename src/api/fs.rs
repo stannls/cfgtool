@@ -1,11 +1,11 @@
 use std::rc::Rc;
 use std::error::Error;
-use std::ffi::{CString, OsString};
+use std::ffi::CString;
 use std::fs;
 use std::path::{Path, PathBuf};
 
 use git2::string_array::StringArray;
-use git2::{Index, Repository, Status, Commit};
+use git2::{Repository, Commit};
 
 pub struct DotfileStorage {
     repo_path: PathBuf,
