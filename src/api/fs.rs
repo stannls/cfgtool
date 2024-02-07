@@ -4,6 +4,7 @@ use std::ffi::CString;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use git2::build::CheckoutBuilder;
 use git2::string_array::StringArray;
 use git2::{Repository, Commit};
 
@@ -195,6 +196,40 @@ impl DotfileStorage {
         }
         Ok(())
 
+    }
+    // Fetches and fast-forwards the main branch of the default remote
+    pub fn pull_main(&mut self) -> Result<(), Box<dyn Error + Send + Sync>> {
+        let mut remote = self.repo.find_remote(self.get_default_remote().ok_or(Box::new(std::io::Error::new(std::io::ErrorKind::InvalidInput, "No remote found.")))?)?;
+        remote.fetch(&["main"], None, None)?;
+
+        let fetch_head = self.repo.find_reference("FETCH_HEAD")?;
+        let fetch_commit = self.repo.reference_to_annotated_commit(&fetch_head)?;
+        let analysis = self.repo.merge_analysis(&[&fetch_commit])?;
+
+        if analysis.0.is_up_to_date() {
+            Ok(())
+        } else if analysis.0.is_fast_forward() {
+            let refname = format!("refs/heads/{}", "main");
+            let mut reference = self.repo.find_reference(&refname)?;
+            reference.set_target(fetch_commit.id(), "Fast-Forward")?;
+            self.repo.set_head(&refname)?;
+            self.repo.checkout_head(Some(CheckoutBuilder::default().force()))?;
+            Ok(())
+        } else {
+            Err(Box::new(std::io::Error::new(std::io::ErrorKind::Other, "Only fast-forward supported.")))
+        }
+    }
+
+    pub fn push_main(&mut self) -> Result<(), Box<dyn Error + Send + Sync>> {
+        let mut remote = self.repo.find_remote(self.get_default_remote().ok_or(Box::new(std::io::Error::new(std::io::ErrorKind::InvalidInput, "No remote found.")))?)?;
+        let branch = self.repo.branches(None)?
+            .filter(|f| f.as_ref().unwrap().0.name().unwrap().unwrap() == "main")
+            .last()
+            .ok_or(Box::new(std::io::Error::new(std::io::ErrorKind::InvalidInput, "No main branch found.")))??.0;
+        let branch_ref = branch.into_reference();
+        let branch_ref_name = branch_ref.name().unwrap();
+        remote.push(&[branch_ref_name], None)?;
+        Ok(())
     }
 }
 
