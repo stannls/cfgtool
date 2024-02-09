@@ -27,6 +27,8 @@ fn main() {
         .subcommand(Command::new("sync").about("Sync your dotfiles with a remote")
                     .arg(Arg::new("force")
                          .short('f')
+                         .long("force")
+                         .num_args(0)
                          .help("Force the sync omitting local changes.")
                          .required(false)))
         .subcommand(Command::new("rollback").about("Rollback a file to a previous version"));
@@ -92,8 +94,8 @@ fn handle_command(matches: &ArgMatches) -> Result<(), Box<dyn Error + Sync + Sen
             Ok(())
         }
         ("sync", subcommand_match) => {
-            if dotfile_repo.get_changed_files()?.len() != 0 && !subcommand_match.contains_id("force") {
-                println!("Warning you still have untracked local changes. Syncing now would overwrite them. Run the force flag to ignore")
+            if dotfile_repo.get_changed_files()?.len() != 0 && !subcommand_match.get_one::<bool>("force").unwrap() {
+                println!("Warning you still have untracked local changes. Syncing now would overwrite them. Run the force flag to ignore.")
             } else {
                 match dotfile_repo.get_default_remote() {
                     Some(remote) => println!("Default remote {remote}."),
