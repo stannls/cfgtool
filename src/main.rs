@@ -66,10 +66,10 @@ fn handle_command(matches: &ArgMatches) -> Result<(), Box<dyn Error + Sync + Sen
             }
         }
         ("update", _subcommand_match) => {
-            if dotfile_repo.get_changed_files()?.len() == 0 {
+            if dotfile_repo.get_changed_files(true)?.len() == 0 {
                 println!("Nothing has changed.");
             }
-            for file in dotfile_repo.get_changed_files()? {
+            for file in dotfile_repo.get_changed_files(true)? {
                 print!(
                     "File {} has changed. Do you want to track the changes? (y/n) ",
                     file.to_owned()
@@ -94,7 +94,7 @@ fn handle_command(matches: &ArgMatches) -> Result<(), Box<dyn Error + Sync + Sen
             Ok(())
         }
         ("sync", subcommand_match) => {
-            if dotfile_repo.get_changed_files()?.len() != 0 && !subcommand_match.get_one::<bool>("force").unwrap() {
+            if dotfile_repo.get_changed_files(true)?.len() != 0 && !subcommand_match.get_one::<bool>("force").unwrap() {
                 println!("Warning you still have untracked local changes. Syncing now would overwrite them. Run the force flag to ignore.")
             } else {
                 match dotfile_repo.get_default_remote() {
@@ -127,6 +127,7 @@ fn handle_command(matches: &ArgMatches) -> Result<(), Box<dyn Error + Sync + Sen
                         }
                     }
                 }
+                dotfile_repo.copy_repo_to_local()?;
             }
             Ok(())
         }

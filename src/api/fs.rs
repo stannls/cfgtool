@@ -101,8 +101,8 @@ impl DotfileStorage {
     }
 
     // Function that returns all tracked file that have a diff to the git repo
-    pub fn get_changed_files(&self) -> Result<Vec<PathBuf>, Box<dyn Error +Send +Sync>> {
-        Ok(self.get_tracked_files()?.into_iter()
+    pub fn get_changed_files(&self, localise_paths: bool) -> Result<Vec<PathBuf>, Box<dyn Error +Send +Sync>> {
+        let changed = self.get_tracked_files()?.into_iter()
             .filter(|f| {
                 // The local counterpart to the tracked file
                 let local_counterpart: PathBuf = dirs::home_dir().unwrap().as_path().iter()
@@ -112,10 +112,14 @@ impl DotfileStorage {
                 let local_file = fs::read_to_string(local_counterpart).unwrap();
                 // Checks for diff
                 repo_file != local_file
-            })
+            });
+        Ok(if localise_paths {
             // Convert every remaining path into their local counterpart
-            .map(|f| dirs::home_dir().unwrap().as_path().iter().chain(f.as_path().iter().skip(self.repo_path.as_path().iter().count())).collect::<PathBuf>())
-            .collect())
+            changed.map(|f| dirs::home_dir().unwrap().as_path().iter().chain(f.as_path().iter().skip(self.repo_path.as_path().iter().count())).collect::<PathBuf>())
+                .collect()
+        } else {
+            changed.collect()
+        }) 
     }
 
     // Helper function that adds a file to the index and then commits.
@@ -229,6 +233,16 @@ impl DotfileStorage {
         let branch_ref = branch.into_reference();
         let branch_ref_name = branch_ref.name().unwrap();
         remote.push(&[branch_ref_name], None)?;
+        Ok(())
+    }
+
+    // Copy every file with diffs from the repo to its local counterpart.
+    // This will overwrite unstaged changes
+    pub fn copy_repo_to_local(&mut self) -> Result<(), Box<dyn Error +Send +Sync>> {
+        for file in self.get_changed_files(false)? {
+            let local_file = dirs::home_dir().unwrap().as_path().iter().chain(file.as_path().iter().skip(self.repo_path.as_path().iter().count())).collect::<PathBuf>();
+            fs::copy(file, local_file)?;
+        }
         Ok(())
     }
 }
