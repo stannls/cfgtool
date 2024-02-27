@@ -48,7 +48,7 @@ fn handle_command(matches: &ArgMatches) -> Result<(), Box<dyn Error + Sync + Sen
     // Get stdin
     let stdin = io::stdin();
 
-    match matches.subcommand().expect("This should never happen.") {
+    let response = match matches.subcommand().expect("This should never happen.") {
         ("track", subcommand_match) => {
             if dotfile_repo.is_tracked(
                 subcommand_match
@@ -144,5 +144,10 @@ fn handle_command(matches: &ArgMatches) -> Result<(), Box<dyn Error + Sync + Sen
             Ok(())
         }
         (_, _) => Ok(()),
+    };
+    if response.is_err() {
+        let err = response.err().unwrap();
+        println!("Error: {}", err.to_string());
     }
+    Ok(())
 }
