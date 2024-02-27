@@ -1,6 +1,9 @@
 use api::fs::DotfileStorage;
-use clap::{Command, arg, value_parser, ArgMatches};
-use std::{error::Error, io::{self, BufRead, Write}};
+use clap::{arg, value_parser, Arg, ArgMatches, Command};
+use std::{
+    error::Error,
+    io::{self, BufRead, Write},
+};
 mod api;
 
 fn main() {
@@ -9,27 +12,33 @@ fn main() {
         .version("0.0.1")
         .about("A simple git wrapper to manage your dotfiles")
         .subcommand_required(true)
-        .subcommand(Command::new("track")
-                    .about("Track a file with cfgtool.")
-                    .arg(arg!(<PATH>)
-                         .id("path")
-                         .help("The path of the file to track.")
-                         .required(true)
-                         .value_parser(value_parser!(std::path::PathBuf))
-                         )
-                    )
-        .subcommand(Command::new("update")
-                    .about("Update all tracked files."))
-        .subcommand(Command::new("sync")
-                    .about("Sync your dotfiles with a remote"))
-        .subcommand(Command::new("rollback")
-                    .about("Rollback a file to a previous version"));
+        .subcommand(
+            Command::new("track")
+                .about("Track a file with cfgtool.")
+                .arg(
+                    arg!(<PATH>)
+                        .id("path")
+                        .help("The path of the file to track.")
+                        .required(true)
+                        .value_parser(value_parser!(std::path::PathBuf)),
+                ),
+        )
+        .subcommand(Command::new("update").about("Update all tracked files."))
+        .subcommand(Command::new("sync").about("Sync your dotfiles with a remote")
+                    .arg(Arg::new("force")
+                         .short('f')
+                         .long("force")
+                         .num_args(0)
+                         .help("Force the sync omitting local changes.")
+                         .required(false)))
+        .subcommand(Command::new("rollback").about("Rollback a file to a previous version"));
     let matches = cmd.get_matches();
     handle_command(&matches).expect("Error handling command.");
 }
 
 fn handle_command(matches: &ArgMatches) -> Result<(), Box<dyn Error + Sync + Send>> {
-    let mut dotfile_repo_path = dirs::data_dir().expect("Critical Failure while trying to create config dir");
+    let mut dotfile_repo_path =
+        dirs::data_dir().expect("Critical Failure while trying to create config dir");
 
     // Initialise the dotfile repo struct
     dotfile_repo_path.push("cfgtool");
@@ -40,19 +49,34 @@ fn handle_command(matches: &ArgMatches) -> Result<(), Box<dyn Error + Sync + Sen
 
     match matches.subcommand().expect("This should never happen.") {
         ("track", subcommand_match) => {
-            if dotfile_repo.is_tracked(subcommand_match.get_one("path").expect("Should never happen.")){
+            if dotfile_repo.is_tracked(
+                subcommand_match
+                    .get_one("path")
+                    .expect("Should never happen."),
+            ) {
                 println!("File is already tracked.");
                 Ok(())
             } else {
-                dotfile_repo.track_file(subcommand_match.get_one("path").expect("Should never happen."), None)
+                dotfile_repo.track_file(
+                    subcommand_match
+                        .get_one("path")
+                        .expect("Should never happen."),
+                    None,
+                )
             }
-        },
+        }
         ("update", _subcommand_match) => {
-            if dotfile_repo.get_changed_files()?.len() == 0 {
+            if dotfile_repo.get_changed_files(true)?.len() == 0 {
                 println!("Nothing has changed.");
             }
-            for file in dotfile_repo.get_changed_files()? {
-                print!("File {} has changed. Do you want to track the changes? (y/n) ", file.to_owned().into_os_string().to_string_lossy().to_string());
+            for file in dotfile_repo.get_changed_files(true)? {
+                print!(
+                    "File {} has changed. Do you want to track the changes? (y/n) ",
+                    file.to_owned()
+                        .into_os_string()
+                        .to_string_lossy()
+                        .to_string()
+                );
                 //  Ensure text gets printed
                 io::stdout().flush()?;
                 // Cant directly match the response because then stdin won't get unlocked
@@ -62,14 +86,51 @@ fn handle_command(matches: &ArgMatches) -> Result<(), Box<dyn Error + Sync + Sen
                         println!("Please describe your changes:");
                         let msg = stdin.lock().lines().next().unwrap().unwrap();
                         dotfile_repo.track_file(&file, Some(&msg))?;
-                    },
+                    }
                     "n" => println!("Ignoring..."),
-                    _ => println!("Invalid input given. Skipping for now.")
+                    _ => println!("Invalid input given. Skipping for now."),
                 }
             }
             Ok(())
         }
-        (_, _) => Ok(())
-        
+        ("sync", subcommand_match) => {
+            if dotfile_repo.get_changed_files(true)?.len() != 0 && !subcommand_match.get_one::<bool>("force").unwrap() {
+                println!("Warning you still have untracked local changes. Syncing now would overwrite them. Run the force flag to ignore.")
+            } else {
+                match dotfile_repo.get_default_remote() {
+                    Some(remote) => println!("Default remote {remote}."),
+                    None => {
+                        print!("No remote to sync known. Do you want to add one? (y/n) ");
+                        //  Ensure text gets printed
+                        io::stdout().flush()?;
+                        // Cant directly match the response because then stdin won't get unlocked
+                        let response = stdin.lock().lines().next().unwrap().unwrap();
+                        match response.as_str() {
+                            "y" => {
+                                println!("Please enter the remotes url:");
+                                let url = stdin.lock().lines().next().unwrap().unwrap();
+                                dotfile_repo.add_remote("origin", &url)?;
+                            }
+                            "n" => println!("Ignoring..."),
+                            _ => println!("Invalid input given. Skipping for now."),
+                        }
+                    }
+                }
+                // TODO: Respect diff between local files and local repo.
+                // Currently these diffs will get overwritten on sync
+                match dotfile_repo.pull_main() {
+                    Ok(_) => dotfile_repo.push_main()?,
+                    // Continue to push if pull failed because the remote  is empty
+                    Err(e) => {
+                        if e.to_string() == "corrupted loose reference file: FETCH_HEAD" {
+                            dotfile_repo.push_main()?
+                        }
+                    }
+                }
+                dotfile_repo.copy_repo_to_local()?;
+            }
+            Ok(())
+        }
+        (_, _) => Ok(()),
     }
 }

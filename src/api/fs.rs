@@ -4,12 +4,15 @@ use std::ffi::CString;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use git2::build::CheckoutBuilder;
+use git2::string_array::StringArray;
 use git2::{Repository, Commit};
 
 pub struct DotfileStorage {
     repo_path: PathBuf,
     repo: Rc<Repository>,
     tracked_files: Vec<String>,
+    remotes: Vec<String>
 }
 
 impl DotfileStorage {
@@ -30,10 +33,12 @@ impl DotfileStorage {
             .filter(|e| e.is_ok())
             .map(|e| e.unwrap())
             .collect();
+        let remotes = repo.remotes().map(|f| string_arry_to_vec(f))?;
         Ok(DotfileStorage {
             repo_path: path.to_owned(),
             repo: Rc::new(repo),
             tracked_files,
+            remotes,
         })
     }
     pub fn track_file(&mut self, path: &PathBuf, commit_msg: Option<&str>) -> Result<(), Box<dyn Error + Send + Sync>> {
@@ -96,8 +101,8 @@ impl DotfileStorage {
     }
 
     // Function that returns all tracked file that have a diff to the git repo
-    pub fn get_changed_files(&self) -> Result<Vec<PathBuf>, Box<dyn Error +Send +Sync>> {
-        Ok(self.get_tracked_files()?.into_iter()
+    pub fn get_changed_files(&self, localise_paths: bool) -> Result<Vec<PathBuf>, Box<dyn Error +Send +Sync>> {
+        let changed = self.get_tracked_files()?.into_iter()
             .filter(|f| {
                 // The local counterpart to the tracked file
                 let local_counterpart: PathBuf = dirs::home_dir().unwrap().as_path().iter()
@@ -107,10 +112,14 @@ impl DotfileStorage {
                 let local_file = fs::read_to_string(local_counterpart).unwrap();
                 // Checks for diff
                 repo_file != local_file
-            })
+            });
+        Ok(if localise_paths {
             // Convert every remaining path into their local counterpart
-            .map(|f| dirs::home_dir().unwrap().as_path().iter().chain(f.as_path().iter().skip(self.repo_path.as_path().iter().count())).collect::<PathBuf>())
-            .collect())
+            changed.map(|f| dirs::home_dir().unwrap().as_path().iter().chain(f.as_path().iter().skip(self.repo_path.as_path().iter().count())).collect::<PathBuf>())
+                .collect()
+        } else {
+            changed.collect()
+        }) 
     }
 
     // Helper function that adds a file to the index and then commits.
@@ -175,4 +184,69 @@ impl DotfileStorage {
             .collect();
         Path::new(&repo_location).exists()
     }
+    pub fn get_default_remote(&self) -> Option<&str> {
+        if self.remotes.iter().any(|f| f == &"origin") {
+            Some("origin")
+        } else if self.remotes.len() != 0 {
+            self.remotes.get(0).map(|f| f.as_str())
+        } else  {
+            None
+        }
+    }
+    pub fn add_remote(&mut self, name: &str, url: &str) -> Result<(), Box<dyn Error + Send + Sync>> {
+        self.repo.remote_set_url(name, url)?;
+        if !self.remotes.iter().any(|f| f == name) {
+            self.remotes.push(name.to_string());
+        }
+        Ok(())
+
+    }
+    // Fetches and fast-forwards the main branch of the default remote
+    pub fn pull_main(&mut self) -> Result<(), Box<dyn Error + Send + Sync>> {
+        let mut remote = self.repo.find_remote(self.get_default_remote().ok_or(Box::new(std::io::Error::new(std::io::ErrorKind::InvalidInput, "No remote found.")))?)?;
+        remote.fetch(&["main"], None, None)?;
+
+        let fetch_head = self.repo.find_reference("FETCH_HEAD")?;
+        let fetch_commit = self.repo.reference_to_annotated_commit(&fetch_head)?;
+        let analysis = self.repo.merge_analysis(&[&fetch_commit])?;
+
+        if analysis.0.is_up_to_date() {
+            Ok(())
+        } else if analysis.0.is_fast_forward() {
+            let refname = format!("refs/heads/{}", "main");
+            let mut reference = self.repo.find_reference(&refname)?;
+            reference.set_target(fetch_commit.id(), "Fast-Forward")?;
+            self.repo.set_head(&refname)?;
+            self.repo.checkout_head(Some(CheckoutBuilder::default().force()))?;
+            Ok(())
+        } else {
+            Err(Box::new(std::io::Error::new(std::io::ErrorKind::Other, "Only fast-forward supported.")))
+        }
+    }
+
+    pub fn push_main(&mut self) -> Result<(), Box<dyn Error + Send + Sync>> {
+        let mut remote = self.repo.find_remote(self.get_default_remote().ok_or(Box::new(std::io::Error::new(std::io::ErrorKind::InvalidInput, "No remote found.")))?)?;
+        let branch = self.repo.branches(None)?
+            .filter(|f| f.as_ref().unwrap().0.name().unwrap().unwrap() == "main")
+            .last()
+            .ok_or(Box::new(std::io::Error::new(std::io::ErrorKind::InvalidInput, "No main branch found.")))??.0;
+        let branch_ref = branch.into_reference();
+        let branch_ref_name = branch_ref.name().unwrap();
+        remote.push(&[branch_ref_name], None)?;
+        Ok(())
+    }
+
+    // Copy every file with diffs from the repo to its local counterpart.
+    // This will overwrite unstaged changes
+    pub fn copy_repo_to_local(&mut self) -> Result<(), Box<dyn Error +Send +Sync>> {
+        for file in self.get_changed_files(false)? {
+            let local_file = dirs::home_dir().unwrap().as_path().iter().chain(file.as_path().iter().skip(self.repo_path.as_path().iter().count())).collect::<PathBuf>();
+            fs::copy(file, local_file)?;
+        }
+        Ok(())
+    }
+}
+
+fn string_arry_to_vec(arr: StringArray) -> Vec<String> {
+    arr.into_iter().map(|f| f.map(|g| g.to_string()).unwrap()).collect()
 }
