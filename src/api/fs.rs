@@ -87,7 +87,7 @@ impl DotfileStorage {
         Ok(())
     }
     // Helper function that returns all files  currently tracked by the git repo
-    fn get_tracked_files(&self) -> Result<Vec<PathBuf>, Box<dyn Error +Send +Sync>> {
+    pub fn get_tracked_files(&self) -> Result<Vec<PathBuf>, Box<dyn Error +Send +Sync>> {
         let paths = self.repo.index()?.iter()
             .map(|c| CString::new(c.path).unwrap().into_string().unwrap())
             .map(|c| {

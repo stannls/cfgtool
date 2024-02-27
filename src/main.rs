@@ -2,7 +2,7 @@ use api::fs::DotfileStorage;
 use clap::{arg, value_parser, Arg, ArgMatches, Command};
 use std::{
     error::Error,
-    io::{self, BufRead, Write},
+    io::{self, BufRead, Write}, path::PathBuf,
 };
 mod api;
 
@@ -31,7 +31,8 @@ fn main() {
                          .num_args(0)
                          .help("Force the sync omitting local changes.")
                          .required(false)))
-        .subcommand(Command::new("rollback").about("Rollback a file to a previous version"));
+        .subcommand(Command::new("rollback").about("Rollback a file to a previous version"))
+        .subcommand(Command::new("status").about("Display status information about tracked files."));
     let matches = cmd.get_matches();
     handle_command(&matches).expect("Error handling command.");
 }
@@ -128,6 +129,17 @@ fn handle_command(matches: &ArgMatches) -> Result<(), Box<dyn Error + Sync + Sen
                     }
                 }
                 dotfile_repo.copy_repo_to_local()?;
+            }
+            Ok(())
+        }
+        ("status", _subcommand_match) => {
+            let tracked = dotfile_repo.get_tracked_files()?;
+            if tracked.len() == 0 {
+                println!("Nothing tracked yet...");
+            } else {
+                for file in tracked {
+                    println!("{} at location: {}", file.file_name().unwrap().to_string_lossy(), file.as_path().iter().skip(3).collect::<PathBuf>().display());
+                }
             }
             Ok(())
         }
