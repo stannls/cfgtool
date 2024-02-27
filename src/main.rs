@@ -9,7 +9,7 @@ mod api;
 fn main() {
     let cmd = Command::new("cfgtool")
         .bin_name("cfgtool")
-        .version("0.0.1")
+        .version("0.1.0")
         .about("A simple git wrapper to manage your dotfiles")
         .subcommand_required(true)
         .subcommand(
@@ -141,6 +141,10 @@ fn handle_command(matches: &ArgMatches) -> Result<(), Box<dyn Error + Sync + Sen
                     println!("{} at location: {}", file.file_name().unwrap().to_string_lossy(), file.as_path().iter().skip(3).collect::<PathBuf>().display());
                 }
             }
+            Ok(())
+        },
+        ("rollback", _subcommand_match) => {
+            println!("Not yet implemented.");
             Ok(())
         }
         (_, _) => Ok(()),
